@@ -1,0 +1,486 @@
+import { useState, useEffect } from "react";
+
+const COLORS = {
+  bg: "#080B0F", surface: "#0E1318", surfaceHover: "#141A22",
+  border: "#1C2530", borderLight: "#243040",
+  accent: "#C8A96E", accentDim: "#9A7D4E", accentGlow: "rgba(200,169,110,0.12)",
+  text: "#E8EDF2", textMuted: "#6B7A8D", textDim: "#3D4D5E",
+  green: "#4ADE80", greenDim: "rgba(74,222,128,0.1)",
+  blue: "#60A5FA", blueDim: "rgba(96,165,250,0.1)",
+};
+
+const css = `
+  @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=DM+Mono:wght@300;400&family=Outfit:wght@300;400;500;600&display=swap');
+  *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+  html,body { overflow-x:hidden; }
+  body { background:${COLORS.bg}; color:${COLORS.text}; font-family:'Outfit',sans-serif; -webkit-font-smoothing:antialiased; }
+  ::-webkit-scrollbar{width:4px} ::-webkit-scrollbar-track{background:${COLORS.bg}} ::-webkit-scrollbar-thumb{background:${COLORS.border};border-radius:2px}
+
+  @keyframes fadeUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+  @keyframes shimmer{0%{background-position:-200% center}100%{background-position:200% center}}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+
+  .fu1{animation:fadeUp .7s .1s ease both}
+  .fu2{animation:fadeUp .7s .2s ease both}
+  .fu3{animation:fadeUp .7s .35s ease both}
+  .fu4{animation:fadeUp .7s .5s ease both}
+
+  .gold{background:linear-gradient(90deg,${COLORS.accentDim},${COLORS.accent},#E8D5A3,${COLORS.accent},${COLORS.accentDim});background-size:200% auto;-webkit-background-clip:text;-webkit-text-fill-color:transparent;animation:shimmer 4s linear infinite}
+  .glass{background:rgba(14,19,24,.85);backdrop-filter:blur(20px);border:1px solid ${COLORS.border}}
+
+  .sr:hover{background:${COLORS.surfaceHover}!important}
+  .sc:hover{border-color:${COLORS.accentDim}!important;transform:translateY(-2px)}
+  .fc:hover{background:${COLORS.surfaceHover}!important;border-color:${COLORS.borderLight}!important}
+  .pni:hover{background:rgba(200,169,110,.08)!important;color:${COLORS.accent}!important}
+  .ctab:hover{background:#D4B87E!important;transform:translateY(-1px);box-shadow:0 8px 32px rgba(200,169,110,.3)!important}
+  .ib:hover{border-color:${COLORS.accent}!important;color:${COLORS.accent}!important}
+
+  @media(max-width:768px){
+    .hide-mobile{display:none!important}
+    .mobile-col{flex-direction:column!important}
+    .mobile-full{width:100%!important}
+    .fg-1{grid-template-columns:1fr!important}
+    .fg-2{grid-template-columns:1fr 1fr!important}
+    .metrics-wrap{flex-direction:column!important}
+    .metrics-wrap>div{border-right:none!important;border-bottom:1px solid ${COLORS.border}}
+    .metrics-wrap>div:last-child{border-bottom:none!important}
+    .mob-nav{display:flex!important}
+    .sidebar{display:none!important}
+    .sidebar.open{display:flex!important;position:fixed;inset:0;width:240px;z-index:200;height:100vh}
+    .overlay{display:block!important}
+    .ham{display:flex!important}
+    .hero-p{padding:110px 20px 70px!important}
+  }
+  @media(min-width:769px) and (max-width:1024px){
+    .fg-3{grid-template-columns:1fr 1fr!important}
+    .fg-stats{grid-template-columns:1fr 1fr!important}
+  }
+  .mob-nav{display:none;position:fixed;bottom:0;left:0;right:0;background:${COLORS.surface};border-top:1px solid ${COLORS.border};z-index:100;padding:6px 0 10px}
+  .ham{display:none}
+  .overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:199}
+`;
+
+function useW() {
+  const [w, setW] = useState(typeof window !== "undefined" ? window.innerWidth : 1200);
+  useEffect(() => { const h = () => setW(window.innerWidth); window.addEventListener("resize", h); return () => window.removeEventListener("resize", h); }, []);
+  return w;
+}
+
+const stageC = s => {
+  if (s === "Shipped" || s === "Closed") return { background: COLORS.greenDim, color: COLORS.green };
+  if (s === "Compliance Review" || s === "Awaiting LOC") return { background: COLORS.blueDim, color: COLORS.blue };
+  return { background: COLORS.accentGlow, color: COLORS.accent };
+};
+const riskC = r => r === "low" ? COLORS.green : r === "medium" ? COLORS.accent : "#F87171";
+
+const DEALS = [
+  { id: "EXP-2841", client: "Albrecht & Sons GmbH", dest: "🇩🇪 Germany", commodity: "Medical Devices", value: "$284,500", stage: "Compliance Review", risk: "low", date: "Apr 2", pct: 72 },
+  { id: "EXP-2840", client: "Meridian Trade Co.", dest: "🇸🇬 Singapore", commodity: "Industrial Machinery", value: "$1,200,000", stage: "Document Prep", risk: "medium", date: "Apr 5", pct: 45 },
+  { id: "EXP-2839", client: "Castillo Importaciones", dest: "🇲🇽 Mexico", commodity: "Consumer Electronics", value: "$98,200", stage: "Awaiting LOC", risk: "high", date: "Apr 8", pct: 28 },
+  { id: "EXP-2838", client: "Nordic Supply AS", dest: "🇳🇴 Norway", commodity: "Aerospace Components", value: "$3,450,000", stage: "Shipped", risk: "low", date: "Mar 28", pct: 95 },
+  { id: "EXP-2837", client: "Fujita Logistics KK", dest: "🇯🇵 Japan", commodity: "Agricultural Equipment", value: "$567,000", stage: "Closed", risk: "low", date: "Mar 22", pct: 100 },
+];
+const DOCS = [
+  { name: "Certificate of Origin — EXP-2841", type: "COO", status: "pending", size: "284 KB" },
+  { name: "Commercial Invoice — EXP-2840", type: "INV", status: "approved", size: "156 KB" },
+  { name: "Bill of Lading — EXP-2838", type: "BOL", status: "approved", size: "412 KB" },
+  { name: "SLI Form — EXP-2839", type: "SLI", status: "review", size: "98 KB" },
+  { name: "Packing List — EXP-2840", type: "PKL", status: "approved", size: "73 KB" },
+];
+
+// ── LANDING ────────────────────────────────────────────────────────────────────
+function Landing({ onPortal }) {
+  const [menuOpen, setMenuOpen] = useState(false);
+  const w = useW();
+  const mob = w < 769;
+
+  const features = [
+    { icon: "◈", title: "Deal Pipeline", desc: "Track every export opportunity from prospect to payment with visual stages." },
+    { icon: "◉", title: "Document Vault", desc: "Certificates of origin, HS codes, compliance docs — stored, versioned, shareable." },
+    { icon: "◐", title: "Client Portal", desc: "Clients log in to track shipments and sign documents. Branded to your agency." },
+    { icon: "◑", title: "Compliance Engine", desc: "Country-specific checks. Embargo alerts. Incoterms built into every deal." },
+    { icon: "◒", title: "Revenue Analytics", desc: "Margin per deal, client lifetime value, geographic breakdown — live." },
+    { icon: "◓", title: "White-Label Ready", desc: "Your logo. Your domain. Your brand. Yours from day one." },
+  ];
+
+  return (
+    <div style={{ minHeight: "100vh", background: COLORS.bg, position: "relative" }}>
+      <style>{css}</style>
+      <div style={{ position: "fixed", inset: 0, zIndex: 0, backgroundImage: `linear-gradient(${COLORS.border} 1px,transparent 1px),linear-gradient(90deg,${COLORS.border} 1px,transparent 1px)`, backgroundSize: "60px 60px", opacity: .3, pointerEvents: "none" }} />
+      <div style={{ position: "fixed", top: "-20%", left: "50%", transform: "translateX(-50%)", width: "800px", height: "600px", zIndex: 0, background: "radial-gradient(ellipse,rgba(200,169,110,.06) 0%,transparent 70%)", pointerEvents: "none" }} />
+
+      {/* NAV */}
+      <nav className="glass" style={{ position: "fixed", top: 0, left: 0, right: 0, zIndex: 100, padding: "0 20px", height: "60px", display: "flex", alignItems: "center", justifyContent: "space-between", borderTop: "none", borderLeft: "none", borderRight: "none" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "9px" }}>
+          <div style={{ width: "26px", height: "26px", border: `1px solid ${COLORS.accent}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "10px", color: COLORS.accent, fontFamily: "'DM Mono',monospace", flexShrink: 0 }}>EF</div>
+          <span style={{ fontWeight: 500, fontSize: "13px", letterSpacing: ".05em" }}>EXPORTFLOW</span>
+        </div>
+        <div className="hide-mobile" style={{ display: "flex", gap: "24px", alignItems: "center" }}>
+          {["Features","Pricing","Compliance"].map(x => <span key={x} style={{ color: COLORS.textMuted, fontSize: "12px", cursor: "pointer", letterSpacing: ".03em" }}>{x}</span>)}
+          <button onClick={onPortal} style={{ background: "transparent", border: `1px solid ${COLORS.accent}`, color: COLORS.accent, padding: "6px 14px", fontSize: "11px", cursor: "pointer", letterSpacing: ".08em", fontFamily: "'Outfit',sans-serif" }}
+            onMouseEnter={e=>e.target.style.background=COLORS.accentGlow} onMouseLeave={e=>e.target.style.background="transparent"}>LIVE DEMO →</button>
+        </div>
+        <button className="ham" onClick={()=>setMenuOpen(!menuOpen)} style={{ background: "transparent", border: `1px solid ${COLORS.border}`, color: COLORS.textMuted, width: "34px", height: "34px", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "5px" }}>
+          <span style={{ width: "15px", height: "1px", background: COLORS.textMuted, display: "block" }} />
+          <span style={{ width: "15px", height: "1px", background: COLORS.textMuted, display: "block" }} />
+        </button>
+      </nav>
+
+      {menuOpen && (
+        <div style={{ position: "fixed", top: "60px", left: 0, right: 0, zIndex: 99, background: COLORS.surface, borderBottom: `1px solid ${COLORS.border}`, padding: "20px", display: "flex", flexDirection: "column", gap: "14px" }}>
+          {["Features","Pricing","Compliance"].map(x => <span key={x} style={{ color: COLORS.textMuted, fontSize: "14px", cursor: "pointer" }}>{x}</span>)}
+          <button onClick={()=>{onPortal();setMenuOpen(false)}} style={{ background: COLORS.accent, border: "none", color: COLORS.bg, padding: "11px", fontSize: "12px", cursor: "pointer", fontWeight: 600, letterSpacing: ".08em", fontFamily: "'Outfit',sans-serif" }}>LIVE DEMO →</button>
+        </div>
+      )}
+
+      {/* HERO */}
+      <div className="hero-p" style={{ position: "relative", zIndex: 1, padding: mob ? "110px 20px 70px" : "150px 40px 80px", textAlign: "center", maxWidth: "900px", margin: "0 auto" }}>
+        <div className="fu1" style={{ display: "inline-flex", alignItems: "center", gap: "8px", border: `1px solid ${COLORS.borderLight}`, padding: "4px 12px", marginBottom: "32px", fontSize: "10px", letterSpacing: ".12em", color: COLORS.textMuted, fontFamily: "'DM Mono',monospace" }}>
+          <span style={{ width: "6px", height: "6px", borderRadius: "50%", background: COLORS.green, display: "inline-block", animation: "pulse 2s infinite" }} />
+          EXCLUSIVE REGIONAL LICENSE · 5 TERRITORIES
+        </div>
+        <h1 className="fu2" style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: "clamp(38px,8vw,86px)", fontWeight: 300, lineHeight: 1.05, marginBottom: "22px", letterSpacing: "-.02em" }}>
+          The Operating System<br /><em className="gold" style={{ fontStyle: "italic" }}>for Export Agencies</em>
+        </h1>
+        <p className="fu3" style={{ fontSize: mob ? "14px" : "16px", color: COLORS.textMuted, lineHeight: 1.75, maxWidth: "520px", margin: "0 auto 36px", fontWeight: 300 }}>
+          A world-class client portal, deal pipeline, and compliance engine — built exclusively for boutique export agencies. Licensed by territory, not sold as SaaS.
+        </p>
+        <div className="fu4" style={{ display: "flex", gap: "10px", justifyContent: "center", flexWrap: "wrap" }}>
+          <button className="ctab" onClick={onPortal} style={{ background: COLORS.accent, color: COLORS.bg, border: "none", padding: "13px 26px", fontSize: "12px", cursor: "pointer", fontWeight: 600, letterSpacing: ".06em", fontFamily: "'Outfit',sans-serif", transition: "all .25s" }}>EXPLORE THE PORTAL →</button>
+          <button style={{ background: "transparent", border: `1px solid ${COLORS.border}`, color: COLORS.textMuted, padding: "13px 26px", fontSize: "12px", cursor: "pointer", letterSpacing: ".06em", fontFamily: "'Outfit',sans-serif" }}
+            onMouseEnter={e=>e.target.style.borderColor=COLORS.borderLight} onMouseLeave={e=>e.target.style.borderColor=COLORS.border}>REQUEST LICENSE INFO</button>
+        </div>
+
+        {/* Metrics */}
+        <div className="fu4 metrics-wrap" style={{ display: "flex", justifyContent: "center", marginTop: "60px", borderTop: `1px solid ${COLORS.border}`, borderBottom: `1px solid ${COLORS.border}` }}>
+          {[{ v:"47", u:"min", l:"avg. deal doc time saved" },{ v:"$2.4", u:"M", l:"median annual volume tracked" },{ v:"99.8", u:"%", l:"compliance check accuracy" }].map((m,i,arr) => (
+            <div key={i} style={{ padding: mob ? "18px 20px" : "22px 40px", flex: 1, borderRight: !mob && i<arr.length-1 ? `1px solid ${COLORS.border}` : "none", textAlign: "center" }}>
+              <div style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: mob ? "30px" : "40px", fontWeight: 300, lineHeight: 1 }}>
+                <span className="gold">{m.v}</span><span style={{ fontSize: mob?"16px":"20px", color: COLORS.accentDim }}>{m.u}</span>
+              </div>
+              <div style={{ fontSize: "10px", color: COLORS.textMuted, marginTop: "5px", letterSpacing: ".03em" }}>{m.l}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* FEATURES */}
+      <div style={{ position: "relative", zIndex: 1, maxWidth: "1100px", margin: "0 auto", padding: "0 20px 90px" }}>
+        <div style={{ textAlign: "center", marginBottom: "44px" }}>
+          <p style={{ fontFamily: "'DM Mono',monospace", fontSize: "10px", color: COLORS.accentDim, letterSpacing: ".15em", marginBottom: "12px" }}>// PLATFORM CAPABILITIES</p>
+          <h2 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: "clamp(28px,5vw,42px)", fontWeight: 300 }}>Everything your agency needs.<br /><em style={{ color: COLORS.accentDim }}>Nothing it doesn't.</em></h2>
+        </div>
+        <div className="fg-3" style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: "1px", background: COLORS.border }}>
+          {features.map((f,i) => (
+            <div key={i} className="fc" style={{ background: COLORS.surface, padding: "28px 24px", transition: "all .3s" }}>
+              <div style={{ fontSize: "18px", color: COLORS.accent, marginBottom: "12px", fontFamily: "'DM Mono',monospace" }}>{f.icon}</div>
+              <h3 style={{ fontWeight: 500, fontSize: "13px", marginBottom: "7px", letterSpacing: ".02em" }}>{f.title}</h3>
+              <p style={{ fontSize: "12px", color: COLORS.textMuted, lineHeight: 1.65, fontWeight: 300 }}>{f.desc}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* LICENSE */}
+      <div style={{ position: "relative", zIndex: 1, maxWidth: "880px", margin: "0 auto 90px", padding: "0 20px" }}>
+        <div style={{ border: `1px solid ${COLORS.borderLight}`, padding: mob ? "32px 20px" : "52px", background: `linear-gradient(135deg,${COLORS.surface},rgba(200,169,110,.03))`, position: "relative" }}>
+          <div style={{ position: "absolute", top: "-1px", left: "60px", width: "100px", height: "1px", background: COLORS.accent }} />
+          <div style={{ display: "flex", gap: "40px", flexWrap: "wrap" }}>
+            <div style={{ flex: 1, minWidth: "240px" }}>
+              <p style={{ fontFamily: "'DM Mono',monospace", fontSize: "10px", color: COLORS.accentDim, letterSpacing: ".15em", marginBottom: "16px" }}>// EXCLUSIVE LICENSE MODEL</p>
+              <h2 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: "clamp(26px,4vw,36px)", fontWeight: 300, lineHeight: 1.2, marginBottom: "14px" }}>Own the IP.<br />Own your territory.</h2>
+              <p style={{ fontSize: "13px", color: COLORS.textMuted, lineHeight: 1.7, fontWeight: 300 }}>This isn't a SaaS subscription. You acquire exclusive rights to deploy ExportFlow in your territory. Competitors can't access it. Clients see your brand.</p>
+            </div>
+            <div style={{ minWidth: "200px", width: mob ? "100%" : "auto" }}>
+              <div style={{ background: COLORS.bg, border: `1px solid ${COLORS.border}`, padding: "24px" }}>
+                <div style={{ fontFamily: "'DM Mono',monospace", fontSize: "9px", color: COLORS.textMuted, marginBottom: "5px", letterSpacing: ".1em" }}>REGIONAL LICENSE</div>
+                <div style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: "42px", fontWeight: 300, marginBottom: "3px" }}><span className="gold">$40K</span></div>
+                <div style={{ fontSize: "10px", color: COLORS.textMuted, marginBottom: "18px" }}>one-time · exclusive territory</div>
+                {["Full source code transfer","White-label rights","6-month onboarding support","Lifetime updates (year 1)","No revenue share"].map((x,i) => (
+                  <div key={i} style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "7px", fontSize: "11px" }}>
+                    <span style={{ color: COLORS.accent, fontSize: "8px" }}>✦</span><span style={{ color: COLORS.textMuted, fontWeight: 300 }}>{x}</span>
+                  </div>
+                ))}
+                <div style={{ marginTop: "5px", paddingTop: "14px", borderTop: `1px solid ${COLORS.border}`, fontSize: "9px", color: COLORS.textDim, fontFamily: "'DM Mono',monospace" }}>3 of 5 territories remaining</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <footer style={{ borderTop: `1px solid ${COLORS.border}`, padding: "28px 20px", textAlign: "center", position: "relative", zIndex: 1 }}>
+        <div style={{ fontFamily: "'DM Mono',monospace", fontSize: "9px", color: COLORS.textDim, letterSpacing: ".08em" }}>EXPORTFLOW · EXCLUSIVE REGIONAL LICENSE · HELLO@EXPORTFLOW.IO</div>
+      </footer>
+    </div>
+  );
+}
+
+// ── PORTAL ─────────────────────────────────────────────────────────────────────
+function Portal({ onBack }) {
+  const [nav, setNav] = useState("pipeline");
+  const [sel, setSel] = useState(null);
+  const [sbOpen, setSbOpen] = useState(false);
+  const w = useW();
+  const mob = w < 769;
+
+  const navItems = [
+    { id:"pipeline", icon:"◈", label:"Pipeline" },
+    { id:"documents", icon:"◉", label:"Documents" },
+    { id:"analytics", icon:"◐", label:"Analytics" },
+    { id:"compliance", icon:"◑", label:"Compliance" },
+    { id:"clients", icon:"◒", label:"Clients" },
+  ];
+
+  const Sidebar = () => (
+    <div className={`sidebar${sbOpen?" open":""}`} style={{ width: "215px", flexShrink: 0, background: COLORS.surface, borderRight: `1px solid ${COLORS.border}`, display: "flex", flexDirection: "column", height: "100vh", overflowY: "auto" }}>
+      <div style={{ padding: "18px 16px", borderBottom: `1px solid ${COLORS.border}` }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+          <div style={{ width: "24px", height: "24px", border: `1px solid ${COLORS.accent}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "9px", color: COLORS.accent, fontFamily: "'DM Mono',monospace", flexShrink: 0 }}>EF</div>
+          <span style={{ fontWeight: 500, fontSize: "12px", letterSpacing: ".06em" }}>EXPORTFLOW</span>
+        </div>
+        <div style={{ marginTop: "5px", fontSize: "9px", color: COLORS.textDim, fontFamily: "'DM Mono',monospace" }}>MERIDIAN TRADE AGENCY</div>
+      </div>
+      <nav style={{ padding: "12px 8px", flex: 1 }}>
+        {navItems.map(item => (
+          <div key={item.id} className="pni" onClick={()=>{setNav(item.id);setSbOpen(false)}} style={{ display: "flex", alignItems: "center", gap: "9px", padding: "9px 11px", marginBottom: "2px", cursor: "pointer", borderRadius: "4px", transition: "all .15s", background: nav===item.id?"rgba(200,169,110,.1)":"transparent", color: nav===item.id?COLORS.accent:COLORS.textMuted, fontSize: "12px", fontWeight: nav===item.id?500:400 }}>
+            <span style={{ fontFamily: "'DM Mono',monospace", fontSize: "12px" }}>{item.icon}</span>{item.label}
+          </div>
+        ))}
+      </nav>
+      <div style={{ padding: "13px 16px", borderTop: `1px solid ${COLORS.border}` }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "9px" }}>
+          <div style={{ width: "28px", height: "28px", borderRadius: "50%", background: `linear-gradient(135deg,${COLORS.accentDim},${COLORS.accent})`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "11px", fontWeight: 600, color: COLORS.bg, flexShrink: 0 }}>MA</div>
+          <div><div style={{ fontSize: "11px", fontWeight: 500 }}>Marcus Adler</div><div style={{ fontSize: "9px", color: COLORS.textDim }}>Senior Broker</div></div>
+        </div>
+      </div>
+    </div>
+  );
+
+  const Badge = ({ st }) => {
+    const c = st==="approved"?{bg:COLORS.greenDim,t:COLORS.green}:st==="pending"?{bg:COLORS.accentGlow,t:COLORS.accent}:{bg:COLORS.blueDim,t:COLORS.blue};
+    return <span style={{ fontSize:"9px", padding:"2px 7px", background:c.bg, color:c.t, letterSpacing:".05em" }}>{st.toUpperCase()}</span>;
+  };
+
+  return (
+    <div style={{ display: "flex", height: "100vh", background: COLORS.bg, fontFamily: "'Outfit',sans-serif", overflow: "hidden" }}>
+      <style>{css}</style>
+      {sbOpen && <div className="overlay" onClick={()=>setSbOpen(false)} style={{ display:"block" }} />}
+      <Sidebar />
+
+      <div style={{ flex: 1, overflow: "auto", display: "flex", flexDirection: "column" }}>
+        {/* Topbar */}
+        <div style={{ padding: mob?"10px 14px":"13px 26px", borderBottom:`1px solid ${COLORS.border}`, display:"flex", justifyContent:"space-between", alignItems:"center", background:COLORS.surface, position:"sticky", top:0, zIndex:10, gap:"10px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+            {mob && <button onClick={()=>setSbOpen(true)} style={{ background:"transparent", border:`1px solid ${COLORS.border}`, color:COLORS.textMuted, width:"30px", height:"30px", cursor:"pointer", display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", gap:"4px", flexShrink:0 }}>
+              <span style={{ width:"13px", height:"1px", background:COLORS.textMuted, display:"block" }} />
+              <span style={{ width:"13px", height:"1px", background:COLORS.textMuted, display:"block" }} />
+            </button>}
+            <div>
+              <h1 style={{ fontSize:"15px", fontWeight:500 }}>{navItems.find(n=>n.id===nav)?.label}</h1>
+              {!mob && <div style={{ fontSize:"9px", color:COLORS.textMuted, fontFamily:"'DM Mono',monospace" }}>Mon, 30 Mar 2026</div>}
+            </div>
+          </div>
+          <div style={{ display:"flex", gap:"8px", alignItems:"center", flexShrink:0 }}>
+            {!mob && <div style={{ fontSize:"10px", color:COLORS.textMuted, background:COLORS.bg, border:`1px solid ${COLORS.border}`, padding:"5px 10px", display:"flex", alignItems:"center", gap:"5px" }}><span style={{ color:COLORS.green, fontSize:"7px" }}>●</span> Operational</div>}
+            <button onClick={onBack} className="ib" style={{ background:"transparent", border:`1px solid ${COLORS.border}`, color:COLORS.textMuted, padding:"5px 11px", fontSize:"10px", cursor:"pointer", fontFamily:"'Outfit',sans-serif", transition:"all .2s", whiteSpace:"nowrap" }}>← {mob?"Back":"LANDING"}</button>
+          </div>
+        </div>
+
+        {/* Main scroll area */}
+        <div style={{ padding: mob?"14px":"24px", flex:1, paddingBottom: mob?"80px":"24px" }}>
+
+          {/* Stats */}
+          <div className="fg-stats" style={{ display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:"10px", marginBottom:"20px" }}>
+            {[{l:"Active Deals",v:"23",d:"+4"},{l:"Pipeline Value",v:"$5.6M",d:"+18%"},{l:"Avg. Close Days",v:"34",d:"-6d"},{l:"Compliance Rate",v:"99.8%",d:"+0.2%"}].map((s,i) => (
+              <div key={i} className="sc" style={{ background:COLORS.surface, border:`1px solid ${COLORS.border}`, padding:"16px", transition:"all .25s" }}>
+                <div style={{ fontSize:"9px", color:COLORS.textMuted, marginBottom:"5px", letterSpacing:".04em" }}>{s.l}</div>
+                <div style={{ display:"flex", alignItems:"baseline", gap:"5px" }}>
+                  <span style={{ fontFamily:"'Cormorant Garamond',serif", fontSize: mob?"22px":"28px", fontWeight:300 }}>{s.v}</span>
+                  <span style={{ fontSize:"9px", color:COLORS.green, fontFamily:"'DM Mono',monospace" }}>{s.d}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* PIPELINE */}
+          {nav==="pipeline" && (
+            <div style={{ background:COLORS.surface, border:`1px solid ${COLORS.border}` }}>
+              <div style={{ padding:"14px 18px", borderBottom:`1px solid ${COLORS.border}`, display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+                <span style={{ fontSize:"12px", fontWeight:500 }}>Active Export Deals</span>
+                <button style={{ background:COLORS.accent, color:COLORS.bg, border:"none", padding:"5px 12px", fontSize:"10px", cursor:"pointer", fontWeight:600, letterSpacing:".06em", fontFamily:"'Outfit',sans-serif" }}>+ NEW DEAL</button>
+              </div>
+              {!mob && <div style={{ display:"grid", gridTemplateColumns:"85px 1fr 105px 125px 105px 125px 60px", padding:"7px 18px", borderBottom:`1px solid ${COLORS.border}`, fontSize:"8px", color:COLORS.textDim, letterSpacing:".1em" }}>
+                {["DEAL ID","CLIENT","DESTINATION","COMMODITY","VALUE","STAGE","RISK"].map(h=><span key={h}>{h}</span>)}
+              </div>}
+              {DEALS.map((d,i) => (
+                <div key={i}>
+                  {mob ? (
+                    <div className="sr" onClick={()=>setSel(sel===i?null:i)} style={{ padding:"13px 16px", borderBottom:`1px solid ${COLORS.border}`, cursor:"pointer", background:sel===i?COLORS.surfaceHover:"transparent", transition:"background .15s" }}>
+                      <div style={{ display:"flex", justifyContent:"space-between", marginBottom:"3px" }}>
+                        <span style={{ fontFamily:"'DM Mono',monospace", fontSize:"9px", color:COLORS.accentDim }}>{d.id}</span>
+                        <span style={{ width:"7px", height:"7px", borderRadius:"50%", background:riskC(d.risk), display:"inline-block" }} />
+                      </div>
+                      <div style={{ fontSize:"12px", fontWeight:500, marginBottom:"4px" }}>{d.client}</div>
+                      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+                        <span style={{ fontSize:"11px", color:COLORS.textMuted }}>{d.dest}</span>
+                        <span style={{ ...stageC(d.stage), fontSize:"8px", padding:"2px 6px" }}>{d.stage}</span>
+                      </div>
+                      <div style={{ fontSize:"12px", fontWeight:500, marginTop:"3px" }}>{d.value}</div>
+                    </div>
+                  ) : (
+                    <div className="sr" onClick={()=>setSel(sel===i?null:i)} style={{ display:"grid", gridTemplateColumns:"85px 1fr 105px 125px 105px 125px 60px", padding:"12px 18px", borderBottom:`1px solid ${COLORS.border}`, cursor:"pointer", alignItems:"center", background:sel===i?COLORS.surfaceHover:"transparent", transition:"background .15s" }}>
+                      <span style={{ fontFamily:"'DM Mono',monospace", fontSize:"9px", color:COLORS.accentDim }}>{d.id}</span>
+                      <span style={{ fontSize:"12px" }}>{d.client}</span>
+                      <span style={{ fontSize:"11px", color:COLORS.textMuted }}>{d.dest}</span>
+                      <span style={{ fontSize:"11px", color:COLORS.textMuted }}>{d.commodity}</span>
+                      <span style={{ fontSize:"12px", fontWeight:500 }}>{d.value}</span>
+                      <span><span style={{ ...stageC(d.stage), fontSize:"8px", padding:"2px 6px" }}>{d.stage}</span></span>
+                      <span style={{ width:"7px", height:"7px", borderRadius:"50%", background:riskC(d.risk), display:"inline-block" }} />
+                    </div>
+                  )}
+                  {sel===i && (
+                    <div style={{ padding:"18px", background:COLORS.bg, borderTop:`1px solid ${COLORS.border}` }}>
+                      <div style={{ display:"flex", justifyContent:"space-between", flexWrap:"wrap", gap:"14px" }}>
+                        <div>
+                          <div style={{ fontFamily:"'DM Mono',monospace", fontSize:"9px", color:COLORS.accentDim, marginBottom:"3px" }}>{d.id} · PROGRESS</div>
+                          <div style={{ fontSize:"14px", fontWeight:500, marginBottom:"10px" }}>{d.client}</div>
+                          <div style={{ display:"flex", gap:"22px", flexWrap:"wrap" }}>
+                            {["Next Action","Closing","Assigned"].map((lbl,k) => (
+                              <div key={k}><div style={{ fontSize:"8px", color:COLORS.textDim, letterSpacing:".08em", marginBottom:"2px" }}>{lbl}</div><div style={{ fontSize:"11px", color:COLORS.textMuted }}>{k===0?"Upload CO draft":k===1?d.date:"M. Adler"}</div></div>
+                            ))}
+                          </div>
+                        </div>
+                        <div style={{ textAlign:"right" }}>
+                          <div style={{ fontSize:"8px", color:COLORS.textDim, letterSpacing:".08em", marginBottom:"5px" }}>COMPLETION</div>
+                          <div style={{ fontFamily:"'Cormorant Garamond',serif", fontSize:"30px", fontWeight:300, color:COLORS.accent }}>{d.pct}%</div>
+                          <div style={{ width:"110px", height:"3px", background:COLORS.border, marginTop:"7px" }}><div style={{ width:`${d.pct}%`, height:"100%", background:COLORS.accent }} /></div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* DOCUMENTS */}
+          {nav==="documents" && (
+            <div style={{ background:COLORS.surface, border:`1px solid ${COLORS.border}` }}>
+              <div style={{ padding:"14px 18px", borderBottom:`1px solid ${COLORS.border}`, display:"flex", justifyContent:"space-between", alignItems:"center", flexWrap:"wrap", gap:"8px" }}>
+                <span style={{ fontSize:"12px", fontWeight:500 }}>Document Vault</span>
+                <div className="hide-mobile" style={{ display:"flex", gap:"5px" }}>
+                  {["All","Pending","Approved","Review"].map(f=><button key={f} style={{ background:"transparent", border:`1px solid ${COLORS.border}`, color:COLORS.textMuted, padding:"3px 9px", fontSize:"9px", cursor:"pointer", letterSpacing:".06em", fontFamily:"'Outfit',sans-serif" }}>{f}</button>)}
+                </div>
+              </div>
+              {DOCS.map((doc,i) => (
+                <div key={i} className="sr" style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"13px 18px", borderBottom:`1px solid ${COLORS.border}`, transition:"background .15s", cursor:"pointer", gap:"10px" }}>
+                  <div style={{ display:"flex", alignItems:"center", gap:"12px", minWidth:0 }}>
+                    <div style={{ width:"32px", height:"32px", flexShrink:0, background:COLORS.bg, border:`1px solid ${COLORS.border}`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:"8px", fontFamily:"'DM Mono',monospace", color:COLORS.accent }}>{doc.type}</div>
+                    <div style={{ minWidth:0 }}>
+                      <div style={{ fontSize:"12px", marginBottom:"2px", overflow:"hidden", textOverflow:"ellipsis", whiteSpace: mob?"normal":"nowrap" }}>{doc.name}</div>
+                      <div style={{ fontSize:"9px", color:COLORS.textDim, fontFamily:"'DM Mono',monospace" }}>{doc.size}</div>
+                    </div>
+                  </div>
+                  <div style={{ display:"flex", alignItems:"center", gap:"10px", flexShrink:0 }}>
+                    <Badge st={doc.status} />
+                    <span style={{ fontSize:"10px", color:COLORS.accentDim, cursor:"pointer", fontFamily:"'DM Mono',monospace" }}>↓</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* ANALYTICS */}
+          {nav==="analytics" && (
+            <div className="fg-1" style={{ display:"grid", gridTemplateColumns:"2fr 1fr", gap:"14px" }}>
+              <div style={{ background:COLORS.surface, border:`1px solid ${COLORS.border}`, padding:"20px" }}>
+                <div style={{ fontSize:"10px", color:COLORS.textMuted, marginBottom:"16px", letterSpacing:".05em" }}>REVENUE BY DESTINATION (Q1 2026)</div>
+                {[["🇩🇪 Germany",68],["🇸🇬 Singapore",52],["🇯🇵 Japan",41],["🇳🇴 Norway",38],["🇲🇽 Mexico",24]].map(([c,p],i) => (
+                  <div key={i} style={{ marginBottom:"13px" }}>
+                    <div style={{ display:"flex", justifyContent:"space-between", fontSize:"11px", marginBottom:"4px" }}>
+                      <span>{c}</span><span style={{ color:COLORS.textMuted, fontFamily:"'DM Mono',monospace" }}>{p}%</span>
+                    </div>
+                    <div style={{ height:"3px", background:COLORS.border }}><div style={{ width:`${p}%`, height:"100%", background:`linear-gradient(90deg,${COLORS.accentDim},${COLORS.accent})` }} /></div>
+                  </div>
+                ))}
+              </div>
+              <div style={{ display:"flex", flexDirection:"column", gap:"12px" }}>
+                {[{l:"Q1 Revenue",v:"$2.4M",n:"vs $1.9M Q4 '25"},{l:"Deals Closed",v:"18",n:"avg. 34 days"},{l:"Gross Margin",v:"31.4%",n:"+2.1% QoQ"}].map((item,i) => (
+                  <div key={i} style={{ background:COLORS.surface, border:`1px solid ${COLORS.border}`, padding:"18px", flex:1 }}>
+                    <div style={{ fontSize:"9px", color:COLORS.textMuted, marginBottom:"5px", letterSpacing:".04em" }}>{item.l}</div>
+                    <div style={{ fontFamily:"'Cormorant Garamond',serif", fontSize:"28px", fontWeight:300, marginBottom:"2px" }}>{item.v}</div>
+                    <div style={{ fontSize:"9px", color:COLORS.green, fontFamily:"'DM Mono',monospace" }}>{item.n}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* COMPLIANCE */}
+          {nav==="compliance" && (
+            <div style={{ background:COLORS.surface, border:`1px solid ${COLORS.border}` }}>
+              <div style={{ padding:"14px 18px", borderBottom:`1px solid ${COLORS.border}` }}><span style={{ fontSize:"12px", fontWeight:500 }}>Compliance Engine</span></div>
+              {[
+                { deal:"EXP-2841", check:"Dual-use goods classification", status:"pass", detail:"Medical devices — no dual-use concern detected" },
+                { deal:"EXP-2840", check:"Singapore import licensing", status:"pass", detail:"Valid ICP license on file, expires Dec 2026" },
+                { deal:"EXP-2839", check:"Mexico COFEPRIS certification", status:"warn", detail:"Certification pending — do not ship before receipt" },
+                { deal:"EXP-2839", check:"US EAR compliance (BIS)", status:"pass", detail:"EAR99 classification confirmed" },
+                { deal:"EXP-2838", check:"Norway ECCN export control", status:"pass", detail:"Aerospace components — ECC review complete" },
+              ].map((item,i) => (
+                <div key={i} className="sr" style={{ display:"flex", alignItems:"center", gap:"12px", padding:"13px 18px", borderBottom:`1px solid ${COLORS.border}`, transition:"background .15s", flexWrap:"wrap" }}>
+                  {!mob && <span style={{ fontFamily:"'DM Mono',monospace", fontSize:"9px", color:COLORS.accentDim, width:"68px", flexShrink:0 }}>{item.deal}</span>}
+                  <span style={{ width:"9px", height:"9px", borderRadius:"50%", flexShrink:0, background:item.status==="pass"?COLORS.green:COLORS.accent }} />
+                  <div style={{ flex:1, minWidth:"180px" }}>
+                    <div style={{ fontSize:"12px", marginBottom:"2px" }}>{item.check}</div>
+                    <div style={{ fontSize:"10px", color:COLORS.textMuted }}>{item.detail}</div>
+                  </div>
+                  <span style={{ fontSize:"9px", padding:"2px 7px", flexShrink:0, ...(item.status==="pass"?{background:COLORS.greenDim,color:COLORS.green}:{background:COLORS.accentGlow,color:COLORS.accent}) }}>{item.status.toUpperCase()}</span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* CLIENTS */}
+          {nav==="clients" && (
+            <div style={{ background:COLORS.surface, border:`1px solid ${COLORS.border}` }}>
+              <div style={{ padding:"14px 18px", borderBottom:`1px solid ${COLORS.border}` }}><span style={{ fontSize:"12px", fontWeight:500 }}>Client Accounts</span></div>
+              {[
+                { name:"Albrecht & Sons GmbH", region:"DACH", deals:4, volume:"$1.2M", since:"2021", status:"active" },
+                { name:"Meridian Trade Co.", region:"APAC", deals:7, volume:"$4.8M", since:"2019", status:"active" },
+                { name:"Castillo Importaciones", region:"LATAM", deals:2, volume:"$340K", since:"2024", status:"onboarding" },
+                { name:"Nordic Supply AS", region:"EMEA", deals:11, volume:"$12.1M", since:"2018", status:"active" },
+                { name:"Fujita Logistics KK", region:"APAC", deals:6, volume:"$3.9M", since:"2020", status:"active" },
+              ].map((c,i) => (
+                <div key={i} className="sr" style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"13px 18px", borderBottom:`1px solid ${COLORS.border}`, transition:"background .15s", cursor:"pointer", gap:"10px" }}>
+                  <div style={{ minWidth:0 }}>
+                    <div style={{ fontSize:"12px", fontWeight:500, marginBottom:"2px" }}>{c.name}</div>
+                    <div style={{ fontSize:"10px", color:COLORS.textMuted }}>{c.region} · {c.deals} deals · Since {c.since}</div>
+                  </div>
+                  <div style={{ display:"flex", alignItems:"center", gap:"10px", flexShrink:0 }}>
+                    {!mob && <span style={{ fontSize:"12px", fontWeight:500 }}>{c.volume}</span>}
+                    <span style={{ fontSize:"9px", padding:"2px 7px", ...(c.status==="active"?{color:COLORS.green,background:COLORS.greenDim}:{color:COLORS.accent,background:COLORS.accentGlow}) }}>{c.status.toUpperCase()}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Mobile bottom nav */}
+        <div className="mob-nav" style={{ justifyContent:"space-around", gap:"4px" }}>
+          {navItems.map(item => (
+            <button key={item.id} onClick={()=>setNav(item.id)} style={{ background:"transparent", border:"none", cursor:"pointer", display:"flex", flexDirection:"column", alignItems:"center", gap:"3px", padding:"3px 6px", color:nav===item.id?COLORS.accent:COLORS.textMuted, transition:"color .15s", flex:1 }}>
+              <span style={{ fontSize:"15px", fontFamily:"'DM Mono',monospace" }}>{item.icon}</span>
+              <span style={{ fontSize:"8px", letterSpacing:".04em", fontFamily:"'Outfit',sans-serif" }}>{item.label}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default function App() {
+  const [view, setView] = useState("landing");
+  return view === "landing" ? <Landing onPortal={()=>setView("portal")} /> : <Portal onBack={()=>setView("landing")} />;
+}
